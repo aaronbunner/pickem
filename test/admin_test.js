@@ -1,0 +1,14 @@
+const { chromium, devices } = require('playwright'); const fs=require('fs'); const path=require('path'); const http=require('http');
+const root='/home/claude/pickem';
+const srv=http.createServer((req,res)=>{let p=decodeURIComponent(req.url.split('?')[0]); if(p==='/')p='/index.html'; const f=path.join(root,p);
+ if(!fs.existsSync(f)){res.writeHead(404);return res.end('nf');} res.writeHead(200,{'content-type':{'.html':'text/html','.js':'text/javascript','.json':'application/json','.svg':'image/svg+xml'}[path.extname(f)]||'text/plain'}); fs.createReadStream(f).pipe(res);});
+(async()=>{ await new Promise(r=>srv.listen(8766,r));
+ const b=await chromium.launch(); const ctx=await b.newContext({...devices['iPhone 13'], timezoneId:'America/Chicago'});
+ await ctx.route(/cdnjs\.cloudflare\.com.*xlsx/, r=>r.fulfill({status:200,contentType:'text/javascript',body:fs.readFileSync('node_modules/xlsx/dist/xlsx.full.min.js','utf8')}));
+ await ctx.route(/site\.api\.espn\.com/, r=>r.fulfill({status:200,contentType:'application/json',body:fs.readFileSync('test/espn_fixture.json','utf8')}));
+ const page=await ctx.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(e.message)); page.on('console',m=>{if(m.type()==='error')errs.push(m.text())});
+ await page.goto('http://localhost:8766/admin.html'); await page.setInputFiles('#file','test/week9.xlsx'); await page.waitForTimeout(1500);
+ console.log(await page.evaluate(()=>document.querySelector('#parseMsg').innerText+'\n'+document.querySelector('#summary').innerText.replace(/\n/g,' ')+'\n'+document.querySelector('#matchMsg').innerText));
+ const [dl]=await Promise.all([page.waitForEvent('download'), page.click('#downloadBtn')]); const p=await dl.path(); const j=JSON.parse(fs.readFileSync(p)); console.log('download ok, espnIds:', j.games.filter(g=>g.espnId).length, 'first', j.games[0].espnId);
+ fs.copyFileSync(p,'data/picks.json');
+ await page.screenshot({path:'test/s4_admin.png'}); console.log('errors:',errs); await b.close(); srv.close();})();

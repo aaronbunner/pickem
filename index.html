@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SpreadSheet</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="logo.svg">
+<style>
+  :root {
+    --bg: #0f1420; --card: #182033; --card2: #1f2940; --line: #2a3450;
+    --text: #e8ecf3; --muted: #8b95a8; --dim: #5f6a80;
+    --green: #38c172; --red: #ef5a5a; --amber: #f5b041; --blue: #4f8cff;
+    --green-bg: rgba(56,193,114,.14); --red-bg: rgba(239,90,90,.14); --amber-bg: rgba(245,176,65,.14); --blue-bg: rgba(79,140,255,.16);
+    --tabbar: 64px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom)); }
+  button, select, input { font: inherit; color: inherit; }
+  .hidden { display: none !important; }
+
+  /* Header */
+  header { position: sticky; top: 0; z-index: 10; background: rgba(15,20,32,.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; gap: 10px; }
+  header img { width: 34px; height: 34px; }
+  header .title { font-weight: 800; font-size: 18px; letter-spacing: -.2px; }
+  header .sub { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  header .spacer { flex: 1; }
+  .me-chip { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(79,140,255,.35); border-radius: 999px; padding: 5px 10px; font-size: 13px; font-weight: 600; max-width: 42vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .status-line { display: flex; align-items: center; gap: 8px; padding: 8px 16px 0; color: var(--muted); font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .dot.live { background: var(--red); box-shadow: 0 0 0 0 rgba(239,90,90,.6); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239,90,90,.5);} 70% { box-shadow: 0 0 0 7px rgba(239,90,90,0);} 100% { box-shadow: 0 0 0 0 rgba(239,90,90,0);} }
+  .status-line button { margin-left: auto; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; color: var(--muted); font-size: 12px; }
+
+  main { padding: 10px 16px 16px; max-width: 720px; margin: 0 auto; }
+
+  /* Summary strip */
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 6px 0 14px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px; text-align: center; }
+  .stat .v { font-size: 22px; font-weight: 800; line-height: 1.1; }
+  .stat .l { font-size: 11px; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .4px; }
+  .stat.green .v { color: var(--green); } .stat.red .v { color: var(--red); } .stat.amber .v { color: var(--amber); }
+
+  /* Game cards */
+  .group-h { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; margin: 18px 2px 8px; }
+  .game { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; }
+  .game.live { border-color: rgba(245,176,65,.45); }
+  .team { display: grid; grid-template-columns: 26px 1fr auto auto; align-items: center; gap: 8px; padding: 5px 0; }
+  .team .mark { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--dim); border: 1px solid var(--line); }
+  .team.picked .mark { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .team.picked.win .mark { background: var(--green); border-color: var(--green); }
+  .team.picked.lose .mark { background: var(--red); border-color: var(--red); }
+  .team .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team .name small { color: var(--muted); font-weight: 500; margin-left: 4px; font-size: 12px; }
+  .team .rank { color: var(--muted); font-size: 11px; margin-right: 3px; font-weight: 500; }
+  .team .spread { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+  .team .score { font-size: 20px; font-weight: 800; min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+  .team.pre .score { color: var(--dim); }
+  .team.leader .score { color: var(--text); } .team:not(.leader) .score { color: var(--muted); }
+  .game .foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding-top: 7px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--muted); }
+  .game .foot .when { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .game .foot .when b { color: var(--amber); font-weight: 700; }
+  .pill { border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .pill.win { background: var(--green-bg); color: var(--green); }
+  .pill.lose { background: var(--red-bg); color: var(--red); }
+  .pill.cov { background: var(--amber-bg); color: var(--amber); }
+  .pill.trail { background: var(--red-bg); color: var(--red); }
+  .pill.none { background: var(--card2); color: var(--dim); }
+  .pill.tie { background: var(--card2); color: var(--muted); }
+
+  /* Leaderboard */
+  table.board { width: 100%; table-layout: fixed; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  table.board th, table.board td { padding: 10px 5px; text-align: right; font-variant-numeric: tabular-nums; }
+  table.board th:nth-child(3), table.board th:nth-child(4) { width: 34px; }
+  table.board th:nth-child(5) { width: 50px; } table.board th:nth-child(6) { width: 40px; } table.board th:nth-child(7) { width: 50px; padding-right: 10px; }
+  table.board td:nth-child(7) { padding-right: 10px; }
+  table.board th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; border-bottom: 1px solid var(--line); }
+  table.board td { border-bottom: 1px solid rgba(42,52,80,.6); }
+  table.board tr:last-child td { border-bottom: 0; }
+  table.board th:nth-child(1), table.board td:nth-child(1) { text-align: center; width: 36px; color: var(--muted); padding-left: 6px; padding-right: 0; }
+  table.board th:nth-child(2), table.board td:nth-child(2) { text-align: left; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  table.board td.pts { font-weight: 800; font-size: 17px; }
+  table.board td.live { color: var(--amber); }
+  table.board td.rem { color: var(--muted); }
+  table.board tr.me td { background: var(--blue-bg); }
+  table.board tr.me td:nth-child(2) { color: var(--blue); }
+  table.board tr.nopicks td { color: var(--dim); }
+  table.board tr { cursor: pointer; }
+  .legend { color: var(--muted); font-size: 12px; margin: 8px 2px 0; }
+
+  /* Head to head */
+  .h2h-pick { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .h2h-pick select { width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-weight: 600; appearance: none; -webkit-appearance: none; }
+  .h2h-pick .vs { color: var(--muted); font-weight: 800; font-size: 13px; }
+  .h2h-score { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+  .h2h-score .side { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; }
+  .h2h-score .side .nm { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .h2h-score .side .big { font-size: 40px; font-weight: 900; line-height: 1.1; margin-top: 2px; }
+  .h2h-score .side .rec { color: var(--muted); font-size: 12px; }
+  .h2h-score .side .rec2 { color: var(--dim); font-size: 11px; margin-top: 6px; line-height: 1.3; }
+  .h2h-score .side.lead { border-color: rgba(56,193,114,.5); background: rgba(56,193,114,.06); }
+  .h2h-score .side.lead .big { color: var(--green); }
+  .h2h-score .mid { display: grid; place-items: center; color: var(--dim); font-size: 13px; font-weight: 800; padding: 0 2px; }
+  .h2h-sentence { font-size: 15px; font-weight: 600; margin: 4px 2px 4px; }
+  .h2h-note { color: var(--muted); font-size: 12px; margin: 0 2px 8px; }
+  .cmp { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; }
+  .cmp .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .cmp .matchup { font-weight: 700; color: var(--text); font-size: 14px; }
+  .cmp .matchup small { color: var(--muted); font-weight: 500; }
+  .cmp .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cmp .who { border-radius: 10px; padding: 8px 10px; background: var(--card2); border: 1px solid transparent; }
+  .cmp .who .n { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmp .who .t { font-weight: 700; margin: 2px 0; }
+  .cmp .who .s { font-size: 12px; font-weight: 700; color: var(--dim); }
+  .cmp .who.win { border-color: rgba(56,193,114,.5); background: var(--green-bg); } .cmp .who.win .s { color: var(--green); }
+  .cmp .who.lose { border-color: rgba(239,90,90,.4); } .cmp .who.lose .s { color: var(--red); }
+  .cmp .who.cov { border-color: rgba(245,176,65,.45); } .cmp .who.cov .s { color: var(--amber); }
+  .cmp .who.trail .s { color: var(--red); }
+  .cmp .who.nopick .t { color: var(--dim); }
+  .cmp .same { font-size: 13px; color: var(--muted); } .cmp .same b { color: var(--text); }
+  .cmp .same.win { color: var(--green); } .cmp .same.lose { color: var(--red); } .cmp .same.cov { color: var(--amber); } .cmp .same.trail { color: var(--red); }
+  .toggle { display: flex; gap: 6px; margin: 4px 0 12px; }
+  .toggle button { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px; color: var(--muted); font-weight: 600; font-size: 13px; }
+  .toggle button.on { background: var(--blue-bg); color: var(--blue); border-color: rgba(79,140,255,.4); }
+
+  /* Tab bar */
+  nav { position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--tabbar) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: rgba(15,20,32,.95); backdrop-filter: blur(10px); border-top: 1px solid var(--line); display: flex; z-index: 10; }
+  nav button { flex: 1; background: none; border: 0; color: var(--muted); font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  nav button svg { width: 22px; height: 22px; }
+  nav button.on { color: var(--blue); }
+
+  /* Name picker */
+  .picker { max-width: 480px; margin: 20px auto; padding: 0 16px; }
+  .picker h2 { margin: 0 0 6px; }
+  .picker p { color: var(--muted); margin: 0 0 12px; }
+  .picker input { width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 16px; margin-bottom: 10px; }
+  .names { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .names button { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-weight: 600; text-align: left; }
+  .names button:active { background: var(--card2); }
+  .empty { color: var(--muted); text-align: center; padding: 40px 16px; }
+  .err { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,90,90,.4); border-radius: 12px; padding: 10px 12px; margin: 10px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <img src="logo.svg" alt="">
+  <div>
+    <div class="title" id="appName">SpreadSheet</div>
+    <div class="sub" id="weekLabel">Loading week…</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="me-chip hidden" id="meChip" title="Change who you are"></div>
+</header>
+
+<div class="status-line hidden" id="statusLine">
+  <span class="dot" id="dot"></span><span id="statusText">Connecting to scores…</span>
+  <button id="refreshBtn">Refresh</button>
+</div>
+
+<div id="picker" class="picker hidden">
+  <h2>Who are you?</h2>
+  <p>Pick your name once. This phone will remember it.</p>
+  <input id="nameSearch" placeholder="Search names" autocomplete="off">
+  <div class="names" id="nameList"></div>
+</div>
+
+<main id="main" class="hidden">
+  <section id="view-picks"></section>
+  <section id="view-board" class="hidden"></section>
+  <section id="view-h2h" class="hidden"></section>
+</main>
+
+<nav id="tabs">
+  <button data-view="picks" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>My Picks</button>
+  <button data-view="board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 6h3v2a3 3 0 0 1-3 3M7 6H4v2a3 3 0 0 0 3 3"/></svg>Leaders</button>
+  <button data-view="h2h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.5"/><circle cx="16" cy="16" r="3.5"/><path d="M4 3l16 18"/></svg>1 v 1</button>
+</nav>
+
+<script src="config.js"></script>
+<script src="parser.js"></script>
+<script>
+(function () {
+  const CFG = window.POOL_CONFIG, P = window.PoolParser;
+  const $ = s => document.querySelector(s);
+  const LS = { me: 'pool.me', h2hOther: 'pool.h2h.other' };
+  let data = null, events = [], evalCache = [], me = null, view = 'picks', timer = null, lastUpdate = null, h2hOther = null, h2hMode = 'diff';
+
+  document.title = CFG.appName; $('#appName').textContent = CFG.appName;
+  try { me = localStorage.getItem(LS.me); h2hOther = localStorage.getItem(LS.h2hOther); } catch (e) {}
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtTime = iso => { try { return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } };
+  const fmtDay = iso => { try { return new Date(iso).toLocaleDateString([], { weekday: 'short' }); } catch (e) { return ''; } };
+  const spreadStr = n => '-' + n;
+
+  // ---------- Data loading ----------
+  async function loadPicks() {
+    const r = await fetch(CFG.picksPath + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('picks.json not found (' + r.status + ')');
+    data = await r.json();
+    $('#weekLabel').textContent = (data.weekNumber ? 'Week ' + data.weekNumber + ' · ' : '') + (data.dates || []).map(d => fmtDay(d + 'T12:00:00')).join(' & ') + (data.dates && data.dates[0] ? ' ' + new Date(data.dates[0] + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' }) : '');
+    if (me && !data.players.includes(me)) me = null;
+  }
+
+  async function loadScores() {
+    const dates = (data.dates && data.dates.length) ? data.dates : [];
+    const seen = new Map();
+    let ok = false, lastErr = null;
+    await Promise.all(dates.map(async d => {
+      try {
+        const r = await fetch(CFG.espn + d.replace(/-/g, ''), { cache: 'no-store' });
+        if (!r.ok) throw new Error('ESPN ' + r.status);
+        for (const e of P.flattenEvents(await r.json())) seen.set(e.id, e);
+        ok = true;
+      } catch (e) { lastErr = e; }
+    }));
+    if (ok) { events = [...seen.values()]; lastUpdate = new Date(); }
+    evalCache = data.games.map(g => { const m = P.matchEvent(g, events); const ev = m ? m.event : null; return { game: g, ev, res: P.evaluate(g, ev) }; });
+    updateStatus(ok ? null : lastErr);
+    scheduleRefresh();
+  }
+
+  function updateStatus(err) {
+    const live = evalCache.some(x => x.res.state === 'in');
+    const allDone = evalCache.length && evalCache.every(x => x.res.final);
+    $('#dot').className = 'dot' + (live ? ' live' : '');
+    let t;
+    if (err && !lastUpdate) t = 'Scores unavailable right now (' + (err.message || 'network') + ')';
+    else if (!lastUpdate) t = 'Waiting for scores…';
+    else t = (live ? 'Live · ' : allDone ? 'Final · ' : '') + 'updated ' + lastUpdate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + (err ? ' (last refresh failed)' : '');
+    $('#statusText').textContent = t;
+  }
+
+  function scheduleRefresh() {
+    clearTimeout(timer);
+    const live = evalCache.some(x => x.res.state === 'in');
+    const pending = evalCache.some(x => !x.res.final);
+    if (!pending) return;
+    timer = setTimeout(refresh, (live ? CFG.refreshSecondsLive : CFG.refreshSecondsIdle) * 1000);
+  }
+  async function refresh() { await loadScores(); render(); }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && data) refresh(); });
+  $('#refreshBtn').addEventListener('click', refresh);
+
+  // ---------- Scoring ----------
+  function tally(player) {
+    const picks = data.picks[player] || [];
+    const t = { player, wins: 0, losses: 0, liveW: 0, liveL: 0, pending: 0, hasPicks: picks.some(Boolean) };
+    evalCache.forEach(({ res }, i) => {
+      const pk = picks[i]; if (!pk) return;
+      if (res.final) { if (res.covering === pk) t.wins++; else if (res.covering) t.losses++; }
+      else if (res.state === 'in') { if (res.covering === pk) t.liveW++; else if (res.covering) t.liveL++; else t.pending++; }
+      else t.pending++;
+    });
+    t.proj = t.wins + t.liveW;
+    return t;
+  }
+  function standings() {
+    return data.players.map(tally).sort((a, b) => (b.hasPicks - a.hasPicks) || (b.proj - a.proj) || (b.wins - a.wins) || (a.losses - b.losses) || a.player.localeCompare(b.player));
+  }
+
+  // Per-pick status for a game: 'win' | 'lose' | 'cov' | 'trail' | 'tie' | 'none'
+  function pickStatus(res, pk) {
+    if (!pk) return 'none';
+    if (res.final) return res.covering === pk ? 'win' : (res.covering ? 'lose' : 'tie');
+    if (res.state === 'in') return res.covering === pk ? 'cov' : (res.covering ? 'trail' : 'tie');
+    return 'none';
+  }
+  const statusLabel = (st, res, pk) => {
+    const m = res.margin == null ? null : Math.abs(res.margin);
+    switch (st) {
+      case 'win': return 'Covered'; case 'lose': return 'Missed';
+      case 'cov': return 'Covering by ' + m; case 'trail': return 'Down ' + m + ' ATS';
+      case 'tie': return 'Dead even'; default: return res.state === 'pre' ? 'Not started' : 'No pick';
+    }
+  };
+  const whenText = ({ ev, res }) => {
+    if (!ev) return res.final ? 'Final' : 'Kickoff TBD';
+    if (ev.state === 'pre') return fmtDay(ev.date) + ' ' + fmtTime(ev.date) + (ev.broadcast ? ' · ' + ev.broadcast : '');
+    if (ev.state === 'post') return ev.detail || 'Final';
+    return '<b>' + esc(ev.detail) + '</b>' + (ev.broadcast ? ' · ' + esc(ev.broadcast) : '');
+  };
+
+  // ---------- Views ----------
+  function render() {
+    if (!data) return;
+    if (!me) { showPicker(); return; }
+    $('#picker').classList.add('hidden'); $('#main').classList.remove('hidden'); $('#statusLine').classList.remove('hidden');
+    $('#meChip').textContent = me; $('#meChip').classList.remove('hidden');
+    ['picks', 'board', 'h2h'].forEach(v => $('#view-' + v).classList.toggle('hidden', v !== view));
+    document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+    if (view === 'picks') renderPicks(); else if (view === 'board') renderBoard(); else renderH2H();
+  }
+
+  function showPicker() {
+    $('#picker').classList.remove('hidden'); $('#main').classList.add('hidden'); $('#statusLine').classList.add('hidden'); $('#meChip').classList.add('hidden');
+    const draw = q => {
+      const list = data.players.filter(n => !q || n.toLowerCase().includes(q.toLowerCase()));
+      $('#nameList').innerHTML = list.map(n => '<button data-n="' + esc(n) + '">' + esc(n) + '</button>').join('') || '<div class="empty">No match</div>';
+    };
+    draw(''); $('#nameSearch').value = '';
+    $('#nameSearch').oninput = e => draw(e.target.value);
+    $('#nameList').onclick = e => { const b = e.target.closest('button'); if (!b) return; me = b.dataset.n; try { localStorage.setItem(LS.me, me); } catch (x) {} render(); };
+  }
+  $('#meChip').addEventListener('click', () => { me = null; try { localStorage.removeItem(LS.me); } catch (x) {} render(); });
+
+  function teamRow(side, g, x, picked, st) {
+    const team = g[side.toLowerCase()], res = x.res, ev = x.ev;
+    const s = ev && res.sides ? res.sides[side] : null;
+    const score = res.state === 'pre' || res.scoreA == null ? '–' : (side === 'A' ? res.scoreA : res.scoreB);
+    const other = side === 'A' ? res.scoreB : res.scoreA;
+    const leader = res.state !== 'pre' && score !== '–' && score > other;
+    const name = s ? s.loc : team.name;
+    const rank = s && s.rank ? '<span class="rank">#' + s.rank + '</span>' : '';
+    const cls = ['team', res.state === 'pre' ? 'pre' : '', leader ? 'leader' : '', picked ? 'picked ' + (st === 'win' ? 'win' : st === 'lose' ? 'lose' : '') : ''].join(' ');
+    return '<div class="' + cls + '"><div class="mark">' + side + '</div><div class="name">' + rank + esc(name) + (team.home ? '<small>' + (g.neutral ? 'N' : 'HOME') + '</small>' : '') + '</div><div class="spread">' + (side === 'A' ? spreadStr(g.spread) : '+' + g.spread) + '</div><div class="score">' + score + '</div></div>';
+  }
+
+  function gameCard(x, pk, who) {
+    const g = x.game, res = x.res, st = pickStatus(res, pk);
+    return '<div class="game' + (res.state === 'in' ? ' live' : '') + '">' + teamRow('A', g, x, pk === 'A', st) + teamRow('B', g, x, pk === 'B', st) +
+      '<div class="foot"><div class="when">' + whenText(x) + '</div><span class="pill ' + st + '">' + statusLabel(st, res, pk) + '</span></div></div>';
+  }
+
+  function renderPicks() {
+    const t = tally(me), picks = data.picks[me] || [];
+    let html = '<div class="summary">' +
+      '<div class="stat green"><div class="v">' + t.wins + '</div><div class="l">Wins</div></div>' +
+      '<div class="stat red"><div class="v">' + t.losses + '</div><div class="l">Losses</div></div>' +
+      '<div class="stat amber"><div class="v">' + (t.liveW + '-' + t.liveL) + '</div><div class="l">Live</div></div>' +
+      '<div class="stat"><div class="v">' + t.pending + '</div><div class="l">Left</div></div></div>';
+    if (!t.hasPicks) html += '<div class="empty">No picks on the sheet for ' + esc(me) + ' this week.</div>';
+    const rank = standings().findIndex(s => s.player === me) + 1;
+    if (t.hasPicks) html += '<div class="legend">Currently <b>#' + rank + '</b> of ' + data.players.filter(p => (data.picks[p] || []).some(Boolean)).length + ' · projected ' + t.proj + ' wins' + (data.tiebreak && data.tiebreak[me] != null ? ' · tiebreaker ' + data.tiebreak[me] : '') + '</div>';
+    let lastGroup = null;
+    evalCache.forEach((x, i) => {
+      const grp = (x.game.day || '') + (x.game.slot ? ' · ' + x.game.slot : '');
+      if (grp !== lastGroup) { html += '<div class="group-h">' + esc(grp) + '</div>'; lastGroup = grp; }
+      html += gameCard(x, picks[i]);
+    });
+    $('#view-picks').innerHTML = html;
+  }
+
+  function renderBoard() {
+    const rows = standings();
+    let rank = 0, prevKey = null;
+    let html = '<table class="board"><thead><tr><th>#</th><th>Player</th><th>W</th><th>L</th><th>Live</th><th>Left</th><th>Proj</th></tr></thead><tbody>';
+    rows.forEach((t, i) => {
+      const key = t.proj + '|' + t.wins; if (key !== prevKey) { rank = i + 1; prevKey = key; }
+      html += '<tr class="' + (t.player === me ? 'me' : '') + (t.hasPicks ? '' : ' nopicks') + '" data-p="' + esc(t.player) + '">' +
+        '<td>' + (t.hasPicks ? rank : '–') + '</td><td>' + esc(t.player) + '</td>' +
+        (t.hasPicks ? '<td>' + t.wins + '</td><td>' + t.losses + '</td><td class="live">' + (t.liveW || t.liveL ? t.liveW + '-' + t.liveL : '–') + '</td><td class="rem">' + t.pending + '</td><td class="pts">' + t.proj + '</td>' : '<td colspan="5" style="text-align:left;color:var(--dim)">no picks this week</td>') + '</tr>';
+    });
+    html += '</tbody></table><div class="legend">W/L are final games. Live is games in progress (covering-trailing). Proj = wins + games currently covering. Tap a player to compare 1 v 1.</div>';
+    $('#view-board').innerHTML = html;
+    $('#view-board').querySelector('tbody').onclick = e => { const tr = e.target.closest('tr'); if (!tr) return; const p = tr.dataset.p; if (p && p !== me) { h2hOther = p; try { localStorage.setItem(LS.h2hOther, p); } catch (x) {} } view = 'h2h'; render(); };
+  }
+
+  function renderH2H() {
+    const others = data.players.filter(p => p !== me);
+    if (!h2hOther || !data.players.includes(h2hOther) || h2hOther === me) {
+      const top = standings().find(s => s.player !== me && s.hasPicks); h2hOther = top ? top.player : others[0];
+    }
+    const left = me, right = h2hOther;
+    const opts = (sel) => data.players.map(p => '<option' + (p === sel ? ' selected' : '') + '>' + esc(p) + '</option>').join('');
+    const tl = tally(left), tr = tally(right);
+    const pl = data.picks[left] || [], pr = data.picks[right] || [];
+    const diffIdx = []; let diffLeft = 0;
+    evalCache.forEach((x, i) => { if (pl[i] !== pr[i]) { diffIdx.push(i); if (!x.res.final) diffLeft++; } });
+
+    // Plain-English summary line
+    const lead = tl.proj - tr.proj;
+    let sentence;
+    if (!tl.hasPicks || !tr.hasPicks) sentence = (tl.hasPicks ? right : left) + ' has no picks this week.';
+    else if (lead === 0) sentence = 'Tied right now.';
+    else sentence = (lead > 0 ? left : right) + ' leads by ' + Math.abs(lead) + ' win' + (Math.abs(lead) === 1 ? '' : 's') + ' right now.';
+    if (tl.hasPicks && tr.hasPicks) sentence += ' You picked ' + diffIdx.length + ' game' + (diffIdx.length === 1 ? '' : 's') + ' differently' + (diffLeft ? ', ' + diffLeft + ' of those still undecided.' : '.');
+
+    const side = (name, t, winning) =>
+      '<div class="side' + (winning ? ' lead' : '') + '"><div class="nm">' + esc(name) + '</div><div class="big">' + t.proj + '</div><div class="rec">wins so far</div><div class="rec2">' + t.wins + ' covered · ' + t.losses + ' missed · ' + (t.liveW + t.liveL) + ' live · ' + t.pending + ' to play</div></div>';
+    let html = '<div class="h2h-pick"><select id="selL">' + opts(left) + '</select><div class="vs">VS</div><select id="selR">' + opts(right) + '</select></div>' +
+      '<div class="h2h-score">' + side(left, tl, lead > 0) + '<div class="mid">vs</div>' + side(right, tr, lead < 0) + '</div>' +
+      '<div class="h2h-sentence">' + esc(sentence) + '</div>' +
+      '<div class="h2h-note">"Wins so far" counts finals plus games currently covering, same as the leaderboard.</div>' +
+      '<div class="toggle"><button data-m="diff"' + (h2hMode === 'diff' ? ' class="on"' : '') + '>Games you differ on (' + diffIdx.length + ')</button><button data-m="all"' + (h2hMode === 'all' ? ' class="on"' : '') + '>All ' + evalCache.length + ' games</button></div>';
+
+    const pickName = (pk, x) => { const g = x.game, s = x.res.sides; return pk ? (s ? s[pk].loc : g[pk.toLowerCase()].name) + ' ' + (pk === 'A' ? spreadStr(g.spread) : '+' + g.spread) : 'No pick'; };
+    const word = { win: 'Covered', lose: 'Missed', cov: 'Covering', trail: 'Trailing', tie: 'Even', none: '' };
+    const cell = (name, pk, x) => { const st = pickStatus(x.res, pk); return '<div class="who ' + st + (pk ? '' : ' nopick') + '"><div class="n">' + esc(name) + ' picked</div><div class="t">' + esc(pickName(pk, x)) + '</div><div class="s">' + (word[st] || (x.res.state === 'pre' ? 'Not started' : '')) + '</div></div>'; };
+
+    let n = 0, lastGroup = null;
+    evalCache.forEach((x, i) => {
+      const same = pl[i] === pr[i];
+      if (h2hMode === 'diff' && same) return;
+      n++;
+      const g = x.game;
+      const grp = (g.day || '') + (g.slot ? ' · ' + g.slot : '');
+      if (grp !== lastGroup) { html += '<div class="group-h">' + esc(grp) + '</div>'; lastGroup = grp; }
+      const score = x.res.state === 'pre' ? '' : ' · ' + x.res.scoreA + '-' + x.res.scoreB;
+      html += '<div class="cmp"><div class="top"><div class="matchup">' + esc(g.a.name) + ' <small>' + spreadStr(g.spread) + '</small> vs ' + esc(g.b.name) + '</div><div>' + whenText(x).replace(/<\/?b>/g, '') + score + '</div></div>';
+      if (same) {
+        const st = pickStatus(x.res, pl[i]);
+        html += '<div class="same ' + st + '">Both picked <b>' + esc(pickName(pl[i], x)) + '</b>' + (word[st] ? ' · ' + word[st] : '') + '</div>';
+      } else {
+        html += '<div class="row">' + cell(left, pl[i], x) + cell(right, pr[i], x) + '</div>';
+      }
+      html += '</div>';
+    });
+    if (!n) html += '<div class="empty">You two picked every game the same way. Boring.</div>';
+    $('#view-h2h').innerHTML = html;
+    $('#selL').onchange = e => { me = e.target.value; try { localStorage.setItem(LS.me, me); } catch (x) {} render(); };
+    $('#selR').onchange = e => { h2hOther = e.target.value; try { localStorage.setItem(LS.h2hOther, h2hOther); } catch (x) {} render(); };
+    $('#view-h2h').querySelector('.toggle').onclick = e => { const b = e.target.closest('button'); if (!b) return; h2hMode = b.dataset.m; render(); };
+  }
+
+  $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; view = b.dataset.view; render(); window.scrollTo(0, 0); });
+
+  // ---------- Boot ----------
+  (async function boot() {
+    try { await loadPicks(); } catch (e) { $('#main').classList.remove('hidden'); $('#view-picks').innerHTML = '<div class="err">Could not load this week\'s picks: ' + esc(e.message) + '</div>'; return; }
+    render();
+    await loadScores();
+    render();
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · Upload picks</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<style>
+  :root { --bg:#0f1420; --card:#182033; --line:#2a3450; --text:#e8ecf3; --muted:#8b95a8; --green:#38c172; --red:#ef5a5a; --amber:#f5b041; --blue:#4f8cff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 20px; margin: 0 0 4px; display:flex; align-items:center; gap:10px; } h1 img { width: 30px; height: 30px; }
+  p.lead { color: var(--muted); margin: 0 0 18px; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+  .step h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0 0 10px; }
+  .drop { border: 2px dashed var(--line); border-radius: 12px; padding: 28px 16px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.over { border-color: var(--blue); color: var(--blue); }
+  .drop input { display: none; }
+  button { font: inherit; color: inherit; background: var(--blue); border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 700; cursor: pointer; }
+  button.secondary { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=text], input[type=password] { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; width: 100%; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  .ok { color: var(--green); } .warn { color: var(--amber); } .bad { color: var(--red); }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .summary div { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .summary b { display: block; font-size: 20px; }
+  .summary span { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: 12px; white-space: pre-wrap; max-height: 160px; overflow: auto; }
+  .msg { margin-top: 10px; font-size: 14px; }
+  select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 7px; width: 100%; max-width: 100%; font-size: 12px; }
+  #matchTable { table-layout: fixed; } #matchTable th:nth-child(1) { width: 26px; } #matchTable th:nth-child(3) { width: 48px; } #matchTable th:nth-child(4) { width: 38%; }
+  a { color: var(--blue); }
+</style>
+</head>
+<body>
+<main>
+  <h1><img src="logo.svg" alt=""> <span id="appName">SpreadSheet</span> admin</h1>
+  <p class="lead">Drop the weekly picks sheet. It gets parsed in your browser, matched to ESPN's schedule, and published as <code>data/picks.json</code>. Nothing on this page is visible to other players, but keep the link to yourself anyway.</p>
+
+  <div class="step">
+    <h2>1 · Weekly sheet</h2>
+    <div class="drop" id="drop"><input type="file" id="file" accept=".xlsx,.xls,.xlsm"><div><b>Tap to choose</b> or drop the .xlsx here</div><div id="fileName" style="margin-top:6px"></div></div>
+    <div class="msg" id="parseMsg"></div>
+  </div>
+
+  <div class="step" id="reviewStep" style="display:none">
+    <h2>2 · Review</h2>
+    <div class="summary" id="summary"></div>
+    <table id="matchTable"></table>
+    <div class="msg" id="matchMsg"></div>
+  </div>
+
+  <div class="step" id="publishStep" style="display:none">
+    <h2>3 · Publish</h2>
+    <div class="row">
+      <button id="publishBtn">Publish to GitHub</button>
+      <button class="secondary" id="downloadBtn">Download picks.json</button>
+      <button class="secondary" id="settingsBtn">GitHub settings</button>
+    </div>
+    <div id="settings" style="display:none; margin-top:10px">
+      <label>Repository (owner/name)</label><input type="text" id="ghRepo" placeholder="yourname/pickem">
+      <label>Branch</label><input type="text" id="ghBranch" placeholder="main">
+      <label>Fine-grained personal access token (Contents: read & write on this repo only). Stored only in this browser.</label>
+      <input type="password" id="ghToken" placeholder="github_pat_…">
+      <div class="row" style="margin-top:8px"><button class="secondary" id="saveSettings">Save</button></div>
+    </div>
+    <div class="msg" id="pubMsg"></div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script src="parser.js"></script>
+<script>
+(function () {
+  const CFG = window.POOL_CONFIG, P = window.PoolParser; P.parseWorkbook.XLSX = XLSX;
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  $('#appName').textContent = CFG.appName; document.title = CFG.appName + ' admin';
+  let data = null, events = [];
+
+  // ----- settings -----
+  const S = { repo: 'pool.gh.repo', branch: 'pool.gh.branch', token: 'pool.gh.token' };
+  const get = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+  const defaults = { repo: CFG.github.owner + '/' + CFG.github.repo, branch: CFG.github.branch || 'main' };
+  $('#ghRepo').value = get(S.repo, defaults.repo); $('#ghBranch').value = get(S.branch, defaults.branch); $('#ghToken').value = get(S.token, '');
+  $('#settingsBtn').onclick = () => { const s = $('#settings'); s.style.display = s.style.display === 'none' ? 'block' : 'none'; };
+  $('#saveSettings').onclick = () => { try { localStorage.setItem(S.repo, $('#ghRepo').value.trim()); localStorage.setItem(S.branch, $('#ghBranch').value.trim() || 'main'); localStorage.setItem(S.token, $('#ghToken').value.trim()); } catch (e) {} $('#pubMsg').textContent = 'Settings saved in this browser.'; };
+
+  // ----- file input -----
+  const drop = $('#drop'), file = $('#file');
+  drop.onclick = () => file.click();
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]); });
+  file.onchange = () => { if (file.files[0]) handle(file.files[0]); };
+
+  async function handle(f) {
+    $('#fileName').textContent = f.name; $('#parseMsg').textContent = 'Parsing…'; $('#reviewStep').style.display = 'none'; $('#publishStep').style.display = 'none';
+    try {
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+      data = P.parseWorkbook(wb);
+      const noPicks = data.players.filter(p => !data.picks[p].some(Boolean));
+      $('#parseMsg').innerHTML = '<span class="ok">Parsed:</span> ' + esc(data.weekLabel) + ' · ' + data.games.length + ' games · ' + data.players.length + ' players' + (noPicks.length ? ' · <span class="warn">no picks for: ' + esc(noPicks.join(', ')) + '</span>' : '');
+      if (!data.games.length) throw new Error('No games found. Is this the right sheet layout?');
+      await matchAll();
+    } catch (e) { $('#parseMsg').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+  }
+
+  async function matchAll() {
+    $('#matchMsg').textContent = 'Fetching ESPN schedule for ' + data.dates.join(', ') + '…'; $('#reviewStep').style.display = 'block';
+    const seen = new Map();
+    for (const d of data.dates) {
+      try { const r = await fetch(CFG.espn + d.replace(/-/g, '')); const j = await r.json(); for (const e of P.flattenEvents(j)) seen.set(e.id, e); }
+      catch (e) { $('#matchMsg').innerHTML = '<span class="bad">ESPN fetch failed for ' + d + ': ' + esc(e.message) + '</span>'; }
+    }
+    events = [...seen.values()].sort((a, b) => a.date.localeCompare(b.date));
+    data.games.forEach(g => { g.espnId = null; const m = P.matchEvent(g, events); g._match = m; if (m && m.quality !== 'one') g.espnId = m.event.id; });
+    renderMatches();
+  }
+
+  function renderMatches() {
+    const fullOk = data.games.filter(g => g.espnId).length;
+    $('#summary').innerHTML = '<div><b>' + data.games.length + '</b><span>games</span></div><div><b class="' + (fullOk === data.games.length ? 'ok' : 'warn') + '">' + fullOk + '</b><span>matched</span></div><div><b>' + data.players.length + '</b><span>players</span></div><div><b>' + (data.weekNumber || '?') + '</b><span>week</span></div>';
+    const opt = (g) => '<select data-i="' + g.idx + '"><option value="">— pick ESPN game —</option>' + events.map(e => '<option value="' + e.id + '"' + (g.espnId === e.id ? ' selected' : '') + '>' + esc(e.shortName) + ' · ' + new Date(e.date).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '</option>').join('') + '</select>';
+    let html = '<tr><th>#</th><th>Sheet</th><th>Spread</th><th>ESPN game</th></tr>';
+    for (const g of data.games) {
+      const m = g._match; const cls = g.espnId ? 'ok' : (m ? 'warn' : 'bad');
+      html += '<tr><td>' + (g.idx + 1) + '</td><td>' + esc(g.a.name) + (g.a.home ? ' (H)' : '') + ' vs ' + esc(g.b.name) + (g.b.home ? ' (H)' : '') + '<br><span class="' + cls + '" style="font-size:11px">' + (g.espnId ? 'matched' : m ? 'only one team matched, please confirm' : 'no match, pick manually') + '</span></td><td>-' + g.spread + '</td><td>' + opt(g) + '</td></tr>';
+    }
+    $('#matchTable').innerHTML = html;
+    $('#matchTable').querySelectorAll('select').forEach(s => s.onchange = () => { data.games[+s.dataset.i].espnId = s.value || null; data.games[+s.dataset.i]._match = s.value ? { quality: 'manual' } : null; renderMatches(); });
+    $('#matchMsg').innerHTML = fullOk === data.games.length ? '<span class="ok">Every game matched an ESPN game. Ready to publish.</span>' : '<span class="warn">Fix the unmatched rows above (or publish anyway; unmatched games just won\'t get live scores).</span>';
+    $('#publishStep').style.display = 'block';
+  }
+
+  function payload() {
+    const out = JSON.parse(JSON.stringify(data));
+    out.games.forEach(g => delete g._match);
+    out.generatedAt = new Date().toISOString();
+    return JSON.stringify(out, null, 1);
+  }
+
+  $('#downloadBtn').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([payload()], { type: 'application/json' })); a.download = 'picks.json'; a.click(); };
+
+  $('#publishBtn').onclick = async () => {
+    const repo = get(S.repo, defaults.repo), branch = get(S.branch, defaults.branch), token = get(S.token, '');
+    if (!token || !repo.includes('/')) { $('#settings').style.display = 'block'; $('#pubMsg').innerHTML = '<span class="warn">Add your repo and token first.</span>'; return; }
+    $('#publishBtn').disabled = true; $('#pubMsg').textContent = 'Publishing…';
+    const url = 'https://api.github.com/repos/' + repo + '/contents/' + CFG.picksPath;
+    const hdr = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+    try {
+      let sha = null;
+      const cur = await fetch(url + '?ref=' + branch, { headers: hdr });
+      if (cur.ok) sha = (await cur.json()).sha; else if (cur.status !== 404) throw new Error('GitHub read failed (' + cur.status + ')');
+      const bytes = new TextEncoder().encode(payload()); let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+      const body = { message: 'Picks: ' + (data.weekLabel || 'week ' + data.weekNumber), content: btoa(bin), branch };
+      if (sha) body.sha = sha;
+      const put = await fetch(url, { method: 'PUT', headers: hdr, body: JSON.stringify(body) });
+      if (!put.ok) throw new Error('GitHub write failed (' + put.status + '): ' + (await put.text()).slice(0, 200));
+      $('#pubMsg').innerHTML = '<span class="ok">Published.</span> GitHub Pages usually updates within a minute or two. <a href="./?t=' + Date.now() + '">Open the app</a>';
+    } catch (e) { $('#pubMsg').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+    $('#publishBtn').disabled = false;
+  };
+})();
+</script>
+</body>
+</html>
